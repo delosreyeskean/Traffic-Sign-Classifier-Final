@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Sign Classifier</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 { color: #2c3e50; margin-bottom: 20px; font-size: 24px; }
+        .upload-box {
+            border: 2px dashed #cbd5e1;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8fafc;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        #preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 6px;
+            margin-top: 15px;
+            display: none;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #2980b9; }
+        #result-box {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            display: none;
+            text-align: left;
+        }
+        .res-title { color: #166534; font-weight: bold; font-size: 18px; margin-bottom: 5px; }
+        .res-meta { color: #1e293b; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Traffic Sign Recognition App</h1>
+    
+    <form id="upload-form">
+        <div class="upload-box" onclick="document.getElementById('file-input').click()">
+            <p style="margin: 0; color: #64748b;">Click to upload a traffic sign image</p>
+            <input type="file" id="file-input" name="file" accept="image/*" style="display: none;" onchange="previewImage(event)">
+            <img id="preview" alt="Image preview">
+        </div>
+        <button type="submit">Classify Image</button>
+    </form>
+
+    <div id="result-box">
+        <div class="res-title" id="predicted-sign">Prediction</div>
+        <div class="res-meta" id="confidence-score">Confidence: </div>
+    </div>
+</div>
+
+<script>
+    // Show a preview of the image when the user selects it
+    function previewImage(event) {
+        const reader = new FileReader();
+        reader.onload = function() {
+            const output = document.getElementById('preview');
+            output.src = reader.result;
+            output.style.display = 'block';
+        };
+        reader.readAsDataURL(event.target.files[0]);
+    }
+
+    // Send the image to the Python backend when the button is clicked
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('file-input');
+        if (fileInput.files.length === 0) {
+            alert('Please select an image file first.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const resultBox = document.getElementById('result-box');
+        const predSign = document.getElementById('predicted-sign');
+        const confScore = document.getElementById('confidence-score');
+
+        try {
+            // Send the file to the /predict route in app.py
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            // Display the results on the screen
+            if (response.ok) {
+                predSign.innerText = data.prediction;
+                confScore.innerText = `Confidence: ${data.confidence} (Class ID: ${data.class_id})`;
+                resultBox.style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An unexpected server error occurred.');
+        }
+    });
+</script>
+
+</body>
+</html>
