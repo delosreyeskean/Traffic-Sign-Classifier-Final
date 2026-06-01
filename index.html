@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Sign Classifier</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 { margin-top: 0; font-size: 24px; color: #111827; }
+        p { color: #6b7280; font-size: 14px; margin-bottom: 30px; }
+        
+        #status {
+            padding: 10px;
+            border-radius: 8px;
+            background: #fef3c7;
+            color: #b45309;
+            font-weight: 600;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        /* Custom File Upload Button */
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .btn {
+            border: none;
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn:hover { background-color: #2563eb; }
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        #image-preview {
+            max-width: 250px;
+            border-radius: 12px;
+            display: none;
+            margin: 0 auto 20px auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .result-box {
+            display: none;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        .result-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #3b82f6; font-weight: 700; margin-bottom: 5px; }
+        #prediction-text { font-size: 22px; font-weight: 700; color: #1e3a8a; margin: 0 0 10px 0; }
+        #confidence-text { font-size: 14px; color: #2563eb; font-weight: 600; margin: 0; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🚦 Traffic Sign Classifier</h1>
+        <p>A Convolutional Neural Network deployed fully in your browser.</p>
+
+        <div id="status">Loading Neural Network...</div>
+
+        <div class="upload-btn-wrapper">
+            <button class="btn" id="upload-label">Choose an Image</button>
+            <input type="file" id="file-upload" accept="image/*" disabled>
+        </div>
+        
+        <br>
+        <img id="image-preview" src="" alt="Image preview">
+        
+        <div id="result" class="result-box">
+            <div class="result-title">CNN Prediction</div>
+            <h2 id="prediction-text"></h2>
+            <p id="confidence-text"></p>
+        </div>
+    </div>
+
+    <script>
+        const classes = {
+            0: 'Speed limit (20km/h)', 1: 'Speed limit (30km/h)', 2: 'Speed limit (50km/h)',
+            3: 'Speed limit (60km/h)', 4: 'Speed limit (70km/h)', 5: 'Speed limit (80km/h)',
+            6: 'End of speed limit (80km/h)', 7: 'Speed limit (100km/h)', 8: 'Speed limit (120km/h)',
+            9: 'No passing', 10: 'No passing for vehicles over 3.5 tons',
+            11: 'Right-of-way at intersection', 12: 'Priority road', 13: 'Yield',
+            14: 'Stop', 15: 'No vehicles', 16: 'Vehicles > 3.5 tons prohibited',
+            17: 'No entry', 18: 'General caution', 19: 'Dangerous curve left',
+            20: 'Dangerous curve right', 21: 'Double curve', 22: 'Bumpy road',
+            23: 'Slippery road', 24: 'Road narrows on the right', 25: 'Road work',
+            26: 'Traffic signals', 27: 'Pedestrians', 28: 'Children crossing',
+            29: 'Bicycles crossing', 30: 'Beware of ice/snow', 31: 'Wild animals crossing',
+            32: 'End speed + passing limits', 33: 'Turn right ahead',
+            34: 'Turn left ahead', 35: 'Ahead only', 36: 'Go straight or right',
+            37: 'Go straight or left', 38: 'Keep right', 39: 'Keep left',
+            40: 'Roundabout mandatory', 41: 'End of no passing',
+            42: 'End no passing veh > 3.5 tons'
+        };
+
+        let model;
+
+        // 1. Load the Model
+        async function loadModel() {
+            try {
+                model = await tf.loadLayersModel('./tfjs_model/model.json');
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerText = "✅ Model Ready!";
+                statusDiv.style.background = "#dcfce7";
+                statusDiv.style.color = "#166534";
+                document.getElementById('file-upload').disabled = false;
+            } catch (error) {
+                document.getElementById('status').innerText = "❌ Error loading model.";
+                console.error(error);
+            }
+        }
+
+        // 2. Predict on Upload
+        document.getElementById('file-upload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const imgElement = document.getElementById('image-preview');
+            imgElement.src = URL.createObjectURL(file);
+            imgElement.style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+
+            imgElement.onload = async () => {
+                const tensor = tf.tidy(() => {
+                    let img = tf.browser.fromPixels(imgElement);
+                    let resized = tf.image.resizeBilinear(img, [30, 30]);
+                    let batched = resized.expandDims(0);
+                    return batched;
+                });
+
+                const predictions = await model.predict(tensor).data();
+                const maxIndex = predictions.indexOf(Math.max(...predictions));
+                const confidence = Math.max(...predictions);
+
+                document.getElementById('prediction-text').innerText = classes[maxIndex];
+                document.getElementById('confidence-text').innerText = (confidence * 100).toFixed(2) + "% Confidence";
+                document.getElementById('result').style.display = 'block';
+
+                tensor.dispose();
+            };
+        });
+
+        loadModel();
+    </script>
+</body>
+</html>
