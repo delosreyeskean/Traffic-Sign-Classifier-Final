@@ -10,7 +10,7 @@ st.set_page_config(page_title="Traffic Sign Classifier", page_icon="🚦")
 @st.cache_resource
 def load_model():
     # Load the H5 model file
-    model = tf.keras.models.load_model('traffic_classifier.h5', compile=False)
+    model = tf.keras.models.load_model('traffic_classifier.keras')
     return model
 
 model = load_model()
